@@ -10,7 +10,7 @@
 #   1. 修改软件源-让安装软件包速度最快
 #   2. 配置基础环境：例如默认zsh、配置zshrc文件、VIM环境、tmux配置、自定义Python环境
 #   3. 配置桌面主题环境：
-#   4. 安装软件包工具： 浏览器、图片软件、sogou输入法、Wine
+#   4. 安装软件包工具： 浏览器、图片软件、输入法、Wine
 ########################################################################
 
 
@@ -22,9 +22,9 @@ gui_type="unknown"  # 桌面环境类型检测 kde/gnome/xfce/unknown
 
 default_confirm="no"
 
-python_install_path="~/anaconda3"       # Python3 默认安装路径
+python_install_path="$HOME/anaconda3"       # Python3 默认安装路径
 
-set -e              # 命令执行失败就中止继续执行
+# set -e              # 命令执行失败就中止继续执行
 
 
 prompt(){
@@ -47,22 +47,6 @@ prompt(){
     return 0
 }
 
-ask_prompt(){
-    # 提问， 返回回答结果,第一个参数是问题，第二个参数是默认答案
-    question="$1"
-    str_answer="$2"     # 默认答案
-
-    echo "$question"
-    if [ "$default_confirm" != "yes" ] ; then
-        read tmp_answer
-        if [ "$tmp_answer" != "" ]; then
-            str_answer=$tmp_answer
-        fi
-    fi
-    return $str_answer
-    
-
-}
 check_sys() {
     # 检查系统类型
     if [ -f /etc/os-release ] ; then
@@ -116,7 +100,7 @@ add_aur(){
 [archlinuxcn]
 SigLevel = Optional TrustAll
 # 清华大学
-Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/\$arch
+Server = https://mirrors.ustc.edu.cn/archlinuxcn/\$arch
 END
     fi
     sudo pacman -Sy && sudo $pac_cmd_ins archlinuxcn-keyring  yay
@@ -162,22 +146,22 @@ copy_file(){
 
 install_anaconda()
 {
-	which anaconda >/dev/null
-	if [ "$?" = "0" ] ; then
-		echo "Anaconda3 is already installed!"
-		return 0
-	fi
-	# install anaconda python environment
-	ver="2020.11"
-	prompt "开始下载 Anaconda3... ver:[$ver], file size : 500MB+"
-	wget -c https://repo.anaconda.com/archive/Anaconda3-${ver}-Linux-x86_64.sh
-	prompt "开始安装 Anaconda3...(默认安装位置为： ${python_install_path})"
-	sh Anaconda3-${ver}-Linux-x86_64.sh -p ${python_install_path} -b
-	source ${python_install_path}/etc/profile.d/conda.sh
+        which anaconda >/dev/null
+        if [ "$?" = "0" ] ; then
+                echo "Anaconda3 is already installed!"
+                return 0
+        fi
+        # install anaconda python environment
+        ver="2020.11"
+        prompt "开始下载 Anaconda3... ver:[$ver], file size : 500MB+"
+        wget -c https://repo.anaconda.com/archive/Anaconda3-${ver}-Linux-x86_64.sh
+        prompt "开始安装 Anaconda3...(默认安装位置为： ${python_install_path})"
+        sh Anaconda3-${ver}-Linux-x86_64.sh -p ${python_install_path} -b
+        . ${python_install_path}/etc/profile.d/conda.sh
 }
 
 config_rc(){
-    # TODO： 配置基础资源环境
+    # 配置基础资源环境
     # 配置zsh、 vim、 tmux、 Anaconda3环境
     echo
     prompt "安装基础环境"
@@ -196,32 +180,30 @@ config_rc(){
             sudo chsh -s $zsh_path $user_name
             prompt "安装oh-my-zsh"
             sudo ${pac_cmd_ins} curl git
-            sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+            # sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+            wget -O install-ohmyz.sh https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+            sh ./install-ohmyz.sh --unattended --skip-chsh --keep-zshrc
             # clone
             font_tmp_dir=/tmp/zsh_fonts
             git clone https://github.com/powerline/fonts.git --depth=1 $font_tmp_dir
             # install
             cd $font_tmp_dir && sh ./install.sh && cd - && rm -rf $font_tmp_dir
-            copy_file ./dotfiles/zshrc ~/.zshrc
+            copy_file ./dotfiles/zshrc $HOME/.zshrc
             
             # 配置 vim 
             prompt "开始安装VIM"
             sudo $pac_cmd_ins  vim
-            copy_file ./dotfiles/vimrc ~/.vimrc
+            copy_file ./dotfiles/vimrc $HOME/.vimrc
 
             prompt "开始配置Vundle插件管理器"
-            mkdir -p ~/.vim/bundle/
-            git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+            mkdir -p $HOME/.vim/bundle/
+            git clone https://github.com/VundleVim/Vundle.vim.git $HOME/.vim/bundle/Vundle.vim
             prompt "开始安装VIM插件"
             vim +PluginInstall +qall
             
             # 配置 tmux
             sudo $pac_cmd_ins tmux
-            copy_file ./dotfiles/tmux.conf ~/.tmux.conf
-
-            # 下载安装 Anaconda3 环境
-            install_anaconda
-            conda init zsh
+            copy_file ./dotfiles/tmux.conf $HOME/.tmux.conf
             ;;
         *)
             echo "$os_type 系统类型不支持！"
@@ -284,7 +266,12 @@ config_desktop_theme(){
             # 主题设置
             echo "当前系统安装的主题列表："
             lookandfeeltool -l
-            your_theme=`ask_prompt "选择需要应用的主题:" "com.github.vinceliuice.WhiteSur-kde"`
+            your_theme="com.github.vinceliuice.WhiteSur"
+            echo "选择需要应用的主题(default:WhiteSur):\c" 
+            read str_answer
+            if [ "$str_answer" != "" ] ; then
+                your_theme="$str_answer"
+            fi
             lookandfeeltool -a $your_theme
             ;;
         *)
@@ -307,7 +294,7 @@ config_software_package(){
     case "$os_type" in 
         manjaro)
             yay -S  git net-tools fcitx fcitx-configtool fcitx-cloudpinyin google-chrome netease-cloud-music
-            sudo $pac_cmd_ins gcc make cmake cmake
+            sudo $pac_cmd_ins gcc make cmake
             ;;
         *)
             echo "$os_type 系统类型不支持！"
@@ -316,15 +303,18 @@ config_software_package(){
 }
 
 
-main()
-{
+main(){
     check_sys
     check_desktop_env
     config_repo
     config_software_package
+    # 下载安装 Anaconda3 环境
+    install_anaconda
+    conda init zsh
     config_rc
     config_desktop_theme
-}
+ }
+
 
 usage(){
     # 使用帮助信息
