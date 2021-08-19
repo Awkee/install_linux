@@ -14,10 +14,7 @@
 ########################################################################
 
 
-os_type=""          # Linux操作系统分支类型
-pac_cmd=""          # 包管理命令
-pac_cmd_ins=""      # 包管理命令
-cpu_arc=""          # CPU架构类型，仅支持x86_64
+
 gui_type="unknown"  # 桌面环境类型检测 kde/gnome/xfce/unknown
 
 default_confirm="no"
@@ -26,6 +23,8 @@ python_install_path="$HOME/anaconda3"       # Python3 默认安装路径
 
 # set -e              # 命令执行失败就中止继续执行
 
+
+. ./inc/check_os.sh             # 引入系统类型检测模块
 
 prompt(){
     # 提示确认函数，如果使用 -y 参数不进行提示
@@ -159,6 +158,9 @@ install_anaconda()
         if [ "$?" != "0"] ; then
             read tmp_input
             if [ "$tmp_input" != "" -a  -r `basename $tmp_input` ] ; then
+                python_install_path=$tmp_input
+            else
+                echo "无效目录[$tmp_input]，已经使用默认目录[$python_install_path]安装"
             fi
         fi
         sh Anaconda3-${ver}-Linux-x86_64.sh -p ${python_install_path} -b
@@ -342,7 +344,7 @@ END
 
 ############ 开始执行入口 ######
 
-while getopts gyb:c: arg_val
+while getopts hyb:c: arg_val
 do
     case "$arg_val" in
         y)
