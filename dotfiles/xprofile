@@ -1,0 +1,6 @@
+
+
+# 设置fcitx输入法
+export GTK_IM_MODULE=fcitx
+export QT_IM_MODULE=fcitx
+export XMODIFIERS="@im=fcitx"

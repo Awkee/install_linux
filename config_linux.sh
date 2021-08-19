@@ -6,7 +6,7 @@
 # Created Time: 2021年02月01日 星期一 23时20分14秒
 #
 # 安装Linux系统后的桌面环境配置工作
-# TODO 主要配置内容：
+# 主要配置内容：
 #   1. 修改软件源-让安装软件包速度最快
 #   2. 配置基础环境：例如默认zsh、配置zshrc文件、VIM环境、tmux配置、自定义Python环境
 #   3. 配置桌面主题环境：
@@ -92,14 +92,14 @@ check_sys() {
 
 add_aur(){
     # 添加AUR源配置
-    if grep tsinghua /etc/pacman.conf >/dev/null 
+    if grep ustc /etc/pacman.conf >/dev/null 
     then
-        echo "已经添加了tsinghua的AUR源"
+        echo "已经添加了中国科学技术大学的AUR源"
     else
         cat <<END | sudo tee -a /etc/pacman.conf
 [archlinuxcn]
 SigLevel = Optional TrustAll
-# 清华大学
+# 中国科学技术大学
 Server = https://mirrors.ustc.edu.cn/archlinuxcn/\$arch
 END
     fi
@@ -152,12 +152,18 @@ install_anaconda()
                 return 0
         fi
         # install anaconda python environment
-        ver="2020.11"
+        ver="2021.05"
         prompt "开始下载 Anaconda3... ver:[$ver], file size : 500MB+"
         wget -c https://repo.anaconda.com/archive/Anaconda3-${ver}-Linux-x86_64.sh
         prompt "开始安装 Anaconda3...(默认安装位置为： ${python_install_path})"
+        if [ "$?" != "0"] ; then
+            read tmp_input
+            if [ "$tmp_input" != "" -a  -r `basename $tmp_input` ] ; then
+            fi
+        fi
         sh Anaconda3-${ver}-Linux-x86_64.sh -p ${python_install_path} -b
         . ${python_install_path}/etc/profile.d/conda.sh
+        conda init zsh
 }
 
 config_rc(){
@@ -172,6 +178,8 @@ config_rc(){
     fi
     case "$os_type" in 
         manjaro)
+            # 添加fcitx输入法环境变量配置文件
+            copy_file ./dotfiles/xprofile $HOME/.xprofile
             # 配置 oh-my-zsh
             sudo ${pac_cmd_ins} zsh
             user_name=`whoami`
@@ -226,7 +234,7 @@ check_desktop_env(){
 }
 
 config_desktop_theme(){
-    # TODO： 安装配置桌面主题
+    # 安装配置桌面主题
     echo 
     prompt "开始安装桌面主题"
     str_ret="$?"
@@ -267,12 +275,18 @@ config_desktop_theme(){
             echo "当前系统安装的主题列表："
             lookandfeeltool -l
             your_theme="com.github.vinceliuice.WhiteSur"
-            echo "选择需要应用的主题(default:WhiteSur):\c" 
+            echo -e "输入需要应用的主题(default:WhiteSur):\c" 
             read str_answer
             if [ "$str_answer" != "" ] ; then
                 your_theme="$str_answer"
             fi
             lookandfeeltool -a $your_theme
+
+            echo "=============================================================="
+            echo "="
+            echo "= 更多主题设置可以使用 systemsettings 图形界面进行设置"
+            echo "="
+            echo "=============================================================="
             ;;
         *)
             echo "$os_type 系统类型不支持！"
@@ -282,10 +296,10 @@ config_desktop_theme(){
 
 
 config_software_package(){
-    # TODO: 安装必备的软件包资源
-    # 安装列表： net-tools , 搜狗输入法， 谷歌Chrome浏览器， WPS Office办公软件， 网易云音乐
+    # 安装必备的软件包资源
+    # 安装列表： 网络工具包 , 中文输入法， 谷歌Chrome浏览器， 网易云音乐
     echo 
-    prompt "开始安装必备的软件包资源，浏览器、输入法、办公软件、网易云音乐等"
+    prompt "开始安装必备的软件包资源，浏览器、中文输入法、网易云音乐等"
     str_ret="$?"
     if [ "$str_ret" != "0" ] ; then
         # 取消继续执行
@@ -293,7 +307,7 @@ config_software_package(){
     fi
     case "$os_type" in 
         manjaro)
-            yay -S  git net-tools fcitx fcitx-configtool fcitx-cloudpinyin google-chrome netease-cloud-music
+            yay -S  --needed --noconfirm  git net-tools fcitx fcitx-configtool fcitx-cloudpinyin fcitx-googlepinyin google-chrome netease-cloud-music
             sudo $pac_cmd_ins gcc make cmake
             ;;
         *)
@@ -308,10 +322,8 @@ main(){
     check_desktop_env
     config_repo
     config_software_package
-    # 下载安装 Anaconda3 环境
-    install_anaconda
-    conda init zsh
     config_rc
+    install_anaconda        # 下载安装 Anaconda3 环境
     config_desktop_theme
  }
 
