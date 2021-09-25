@@ -61,7 +61,7 @@ php_ver="7.4"       # 安装PHP版本号
 ## proxy/install_ss.sh自动安装SS脚本
 > SS服务端安装方法很多，本脚本采用的是[GoLang版本](https://github.com/shadowsocks/go-shadowsocks2/releases)，支持**AEAD加密方式**。
 
-
+脚本短地址： [https://git.io/JzXAg](https://git.io/JzXAg)
 脚本的使用介绍如下：
 ```bash
 $ ./install_ss.sh -h
@@ -77,3 +77,17 @@ Usage:
     install_ss.sh enable_bbr                    # 启用BBR加速(服务端第一次安装自动开启)
 
 ```
+
+服务器安装命令：
+```
+curl -o install_ss.sh https://git.io/JzXAg
+sh ./install_ss.sh server
+```
+根据提示，选择或者使用默认值都可以。
+
+成功后，会提示客户端使用的SS链接地址。
+
+> 了解更多关于[AEAD加密方法](https://shadowsocks.org/en/wiki/AEAD-Ciphers.html)。
+
+
+---
