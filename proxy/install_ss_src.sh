@@ -1,6 +1,6 @@
 #!/bin/bash
 ##########################################################
-# 脚本功能： 安装SS(GoLang语言支持AEAD版本) 客户端/服务端脚本
+# 脚本功能： 安装SS(C语言源码编译版本) 客户端/服务端脚本
 # 脚本作者： https://github.com/Awkee
 # 脚本地址: https://github.com/Awkee
 ##########################################################
@@ -16,7 +16,6 @@ none='\e[0m'
 INFO() {
     echo -e "$@" >&2
 }
-
 LOG(){
     echo -e "\033[0;32;7m $1 \033[0m " $2 >&2
 }
@@ -45,34 +44,23 @@ cmd_install() {
     return
 }
 
-
-# 安装ss可执行程序
-install_bin() {
-    
-    if [ -f "/usr/bin/shadowsocks2-linux" ] ; then
-        echo "已经安装成功： /usr/bin/shadowsocks2-linux"
-        echo "你是不是已经安装过ss啦？"
-        exit 0
-    else
-        ver=$(curl -H 'Cache-Control: no-cache' -s https://api.github.com/repos/shadowsocks/go-shadowsocks2/releases | grep -m1 'tag_name' | cut -d\" -f4)
-        if [[ ! $ver ]]; then
-            echo
-            echo -e " $red获取 Shadowsocks-Go 最新版本失败!!!$none"
-            echo
-            echo -e " 请尝试执行如下命令: $green echo 'nameserver 8.8.8.8' >/etc/resolv.conf $none"
-            echo
-            echo " 然后再重新运行脚本...."
-            echo
-            exit 1
-        fi
-        _link="https://github.com/shadowsocks/go-shadowsocks2/releases/download/$ver/shadowsocks2-linux.gz"
-
-        wget -c ${_link}
-        gzip -d shadowsocks2-linux.gz
-        chmod +x shadowsocks2-linux
-        mv shadowsocks2-linux /usr/bin/
-        ln -sf /usr/bin/shadowsocks2-linux /usr/bin/ss2go
-    fi
+## 1. 安装客户端命令
+install_ss_src(){
+	cmd_install shadowsocks-libev  simple-obfs
+	which ss-server >/dev/null
+	if [ "$?" = "0" ] ; then
+		echo "ss-server is already installed !"
+		return 0
+	fi
+	# CentOS 源码编译
+	cmd_install gcc gettext autoconf libtool automake make pcre-devel asciidoc xmlto c-ares-devel libev-devel libsodium-devel mbedtls-devel
+	wget -c https://github.com/shadowsocks/shadowsocks-libev/releases/download/v3.3.5/shadowsocks-libev-3.3.5.tar.gz
+	tar zxf shadowsocks-libev-3.3.5.tar.gz && cd shadowsocks-libev-3.3.5 && ./configure && make && make install
+	which ss-server >/dev/null
+	if [ "$?" = "0" ] ; then
+		echo "ss-server cannot be installed , you need to check reason!"
+		return 1
+	fi
 }
 
 service_port(){
@@ -230,12 +218,18 @@ del_port() {
 # 简单启动命令: 格式为'ss://<cipher_method>:<your_password>@:<your_port>'
 # 想了解AEAD加密方法,请阅读 https://shadowsocks.org/en/wiki/AEAD-Ciphers.html
 ciphers=(
-	aes-128-gcm
-	aes-256-gcm
-	chacha20-ietf-poly1305
-    #AEAD_AES_128_GCM
-    #AEAD_AES_256_GCM
-    #AEAD_CHACHA20_POLY1305
+aes-256-gcm
+aes-192-gcm
+aes-128-gcm
+aes-256-ctr
+aes-192-ctr
+aes-128-ctr
+aes-256-cfb
+aes-192-cfb
+aes-128-cfb
+chacha20-ietf-poly1305
+chacha20-ietf
+chacha20
 )
 
 select_cipher(){
@@ -311,10 +305,26 @@ select_pass() {
     echo "$your_answer"
 }
 
+# Config shadowsocks
+config_shadowsocks(){
+    cat > /etc/shadowsocks.json <<EOF
+{
+    "server":"0.0.0.0",
+    "server_port":${shadowsocksport},
+    "local_address":"127.0.0.1",
+    "local_port":1080,
+    "password":"${shadowsockspwd}",
+    "timeout":300,
+    "method":"${shadowsockscipher}",
+    "fast_open":false
+}
+EOF
+}
+
 # 安装服务端
 install_server() {
     # 安装可执行程序
-    install_bin
+    install_ss_src
     
     init_firewall
 
@@ -328,7 +338,7 @@ add_server(){
     method=`select_cipher`
     server_ip=$(ifconfig eth0 | awk '/inet /{ print $2 }')
     server_port=`select_port`
-
+    
     ss_uri="ss://${method}:${random_password}@${server_ip}:${server_port}"
     echo "客户端/服务端使用的SS链接: ${ss_uri}"
 
@@ -339,7 +349,20 @@ add_server(){
         exit 0
     fi
     service_name="$your_answer"
-    add_service "ss2go -s '${ss_uri}'" "${service_name}"
+    cat > /etc/shadowsocks_${service_name}.json <<EOF
+{
+    "server":"${server_ip}",
+    "server_port":${server_port},
+    "local_address":"127.0.0.1",
+    "local_port":1080,
+    "password":"${random_password}",
+    "timeout":300,
+    "method":"${method}",
+    "fast_open":false
+}
+EOF
+    run_cmd="ss-server -c /etc/shadowsocks_${service_name}.json"
+    add_service "$run_cmd" "${service_name}"
     add_port ${server_port}
 
 }
@@ -395,8 +418,25 @@ install_client() {
         echo "SS_URI 前缀不是以 ss://开头!你确定没搞错？！？"
         return 2
     fi
-    install_bin
-    add_service "ss2go -c '$SS_URI' -socks :${local_port}" "ssclient"
+    method=`echo "${SS_URI:0:5}" | cut -d: -f1`
+    tmp=`echo "${SS_URI:0:5}" | cut -d: -f2`
+    random_password=`echo ${tmp}| cut -d@ -f1`
+    server_ip=`echo ${tmp}| cut -d@ -f2`
+    port=`echo "${SS_URI:0:5}" | cut -d: -f3`
+    # install_bin
+    cat > /tmp/shadowsocks.json <<EOF
+{
+    "server":"${server_ip}",
+    "server_port":${server_port},
+    "local_address":"127.0.0.1",
+    "local_port": ${local_port},
+    "password":"${random_password}",
+    "timeout":300,
+    "method":"${method}",
+    "fast_open":false
+}
+EOF
+    add_service "ss-local -c /tmp/shadowsocks.json" "ssclient"
 }
 
 uninstall() {
@@ -406,7 +446,7 @@ uninstall() {
     if [ "$service_name" = "client" ] ; then
         echo "客户端清理工作"
         systemctl disable --now ssclient.service
-        rm -f /usr/bin/shadowsocks2-linux /usr/bin/ss2go
+        rm -f /usr/local/bin/ss-*
         rm -f /usr/lib/systemd/system/ssclient.service
         systemctl daemon-reload
         exit 0
@@ -421,7 +461,13 @@ uninstall() {
 
 get_uri(){
     # 提取服务配置中的URI信息
-    systemctl cat ${service_name} | awk '/^ExecStart/{ print $3 }' | sed 's/'\''//g'
+    tmpfile=`systemctl cat ${service_name} | awk '/^ExecStart/{ print $3 }'`
+    awk -F: '{gsub(/[\", ]/, "")}
+    $1~/^server$/{ server_ip=$2}
+    $1~/server_port/{ server_port=$2}
+    $1~/password/{ password=$2 }
+    $1~/method/{ method=$2 }
+    END{printf("ss://%s:%s@%s:%s",method, password, server_ip, server_port);}' $tmpfile
 }
 
 info() {
