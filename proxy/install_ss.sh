@@ -164,16 +164,16 @@ select_port() {
 
 # 设置密码
 select_pass() {
-    rand_pass=`echo "$(openssl rand -hex 32)$(date +%s%N)" | md5sum|base64`
+    rand_pass=`echo "$(openssl rand -hex 32)$(date +%s%N)" | md5sum|base64|md5sum | awk '{ print $1}'`
     
-    LOG "随机算法(可以手工执行): echo \"$(openssl rand -hex 32)$(date +%s%N)\" | md5sum|base64)"
-    LOG "请设置代理密码：(直接回车取默认的随机值:${rand_pass}"
+    LOG "随机密码算法(随机序列+系统时间值):" "echo \"$(openssl rand -hex 32)$(date +%s%N)\" | md5sum | awk '{ print $1}'"
+    LOG "请设置代理密码：(直接回车取默认的随机值:" "${rand_pass}"
     read your_answer
     if [ "$your_answer" = "" ] ; then
-        LOG "您选择使用默认值${rand_pass}"
+        LOG "您选择使用默认值:" "${rand_pass}"
         your_answer="${rand_pass}"
     else
-        LOG "自定义密码：${your_answer}"
+        LOG "自定义密码：" "${your_answer}"
     fi
     echo "$your_answer"
 }
