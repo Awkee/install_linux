@@ -15,7 +15,7 @@ INFO() {
     echo -e "$@" >&2
 }
 LOG(){
-    printf "\033[0;32;7m $@ \033[0m\n" >&2
+    echo -e "\033[0;32;7m $1 \033[0m " $2 >&2
 }
 
 # 安装ss可执行程序
@@ -231,6 +231,61 @@ install_client() {
     systemctl status ssclient.service
 }
 
+get_uri(){
+    echo "`awk '/^ExecStart/{ print $3 }' $1 | sed 's/'\''//g'`"
+}
+
+cmd_install() {
+    # 系统命令安装 apt/dnf/zypper/pacman
+    packages="$@"
+    if which apt-get >/dev/null 2>&1 ; then 
+        apt-get install -y ${packages}
+        return
+    fi
+    if which dnf >/dev/null 2>&1 ; then 
+        dnf install -y ${packages}
+        return
+    fi
+    if which zypper >/dev/null 2>&1 ; then 
+        zypper install -y ${packages}
+        return
+    fi
+    if which pacman >/dev/null 2>&1 ; then 
+        pacman -Sy ${packages}
+        return
+    fi
+    LOG "没办法啦！" "没找到适合您当前系统安装命令！如果您知道如何安装，那就手工安装以下软件包：\n ${packages}"
+    return
+}
+
+info() {
+    if [ -f "/usr/lib/systemd/system/ssserver.service" ] ; then
+        uri_str=`get_uri /usr/lib/systemd/system/ssserver.service`
+    else
+        uri_str=`get_uri /usr/lib/systemd/system/ssclient.service`
+    fi
+    LOG "SS原始链接（ss-go客户端配置用）：" ${uri_str}
+    params=`echo ${uri_str:5}`
+    aead_method=`echo $params| cut -d: -f1`
+    method=`echo ${aead_method} | tr 'A-Z' 'a-z' |sed 's/aead_//'`
+    new_uri=`echo -e "$uri_str\c" |sed "s/${aead_method}/${method}/"`
+    share_uri_aead="ss://`echo -e "${uri_str:5}\c" |base64 -w0`#ss01"
+    LOG "分享支持AEAD链接APP用：${share_uri_aead}" 
+    share_uri="ss://`echo -e "${new_uri:5}\c" |base64 -w0`#ss01"
+    LOG "分享不支持AEAD链接APP用：" "${share_uri}"
+    LOG "分享二维码：" "命令示例: qrencode -s6 -l L -t UTF8 -o - \"ss://xxxxxx\""
+    if ! qrencode -h  >/dev/null 2>&1 ; then 
+        LOG "稍等一下..." "正在为您安装qrencode二维码生成工具!"
+        cmd_install qrencode
+    fi
+    if ! qrencode -h  >/dev/null 2>&1 ; then 
+        LOG "糟糕！" "您的系统安装 qrencode 失败!" 
+        return 1
+    fi
+    LOG "分享不支持AEAD链接APP用链接二维码："
+    qrencode -s6 -l L -t UTF8 -o - ${share_uri}
+}
+
 init_config() {
     LOG "时区修改为国内时区"
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
@@ -269,6 +324,7 @@ Usage:
     `basename $0` uninstall  port               # 卸载服务端安装软件及配置，自定义端口port
     `basename $0` uninstall  client             # 卸载客户端安装软件及配置
     `basename $0` enable_bbr                    # 启用BBR加速(服务端第一次安装自动开启)
+    `basename $0` info                          # 查看SS链接URI信息
 END
 }
 
@@ -284,6 +340,9 @@ case "$1" in
     ;;
     enable_bbr)
     $1
+    ;;
+    info|i)
+    info
     ;;
     *)
     usage
