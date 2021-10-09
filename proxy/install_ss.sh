@@ -204,10 +204,7 @@ install_server() {
 
     add_firewall ${server_port}
     enable_bbr
-    INFO "+========================================="
-    INFO "请在客户端使用SS链接: \c"
-    LOG "${ss_uri}"
-    INFO "+========================================="
+    info
 }
 
 # 安装客户端
@@ -264,16 +261,18 @@ info() {
     else
         uri_str=`get_uri /usr/lib/systemd/system/ssclient.service`
     fi
+    INFO "========================================================================"
     LOG "SS原始链接（ss-go客户端配置用）：" ${uri_str}
     params=`echo ${uri_str:5}`
     aead_method=`echo $params| cut -d: -f1`
     method=`echo ${aead_method} | tr 'A-Z' 'a-z' |sed 's/aead_//'`
     new_uri=`echo -e "$uri_str\c" |sed "s/${aead_method}/${method}/"`
     share_uri_aead="ss://`echo -e "${uri_str:5}\c" |base64 -w0`#ss01"
-    LOG "分享支持AEAD链接APP用：" "${share_uri_aead}" 
+    LOG "分享 支持AEAD加密算法链接 移动APP使用：" "${share_uri_aead}" 
     share_uri="ss://`echo -e "${new_uri:5}\c" |base64 -w0`#ss01"
-    LOG "分享不支持AEAD链接APP用：" "${share_uri}"
-    LOG "分享二维码：" "命令示例: qrencode -s6 -l L -t UTF8 -o - \"ss://xxxxxx\""
+    LOG "分享 不支持AEAD加密算法链接 移动APP用：" "${share_uri}"
+    LOG "分享移动APP使用链接的二维码："
+    INFO "========================================================================"
     if ! qrencode -h  >/dev/null 2>&1 ; then 
         LOG "稍等一下..." "正在为您安装qrencode二维码生成工具!"
         cmd_install qrencode
@@ -282,7 +281,6 @@ info() {
         LOG "糟糕！" "您的系统安装 qrencode 失败!" 
         return 1
     fi
-    LOG "分享不支持AEAD链接APP用链接二维码："
     qrencode -s6 -l L -t UTF8 -o - ${share_uri}
 }
 
