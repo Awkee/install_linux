@@ -117,12 +117,14 @@ install_ss_src(){
         exit 1
     fi
     # 安装 v2ray-plugin 插件
-    install_plugin
+    #install_plugin
 }
 
 service_port(){
+    # 提取服务配置中的端口
     service_name="$1"
-    systemctl cat ${service_name} | sed 's/'\''//g' | awk -F: '/^ExecStart/{print $NF }'
+    tmpfile=`systemctl cat ${service_name} | awk '/^ExecStart/{ print $3 }'`
+    awk -F: '{gsub(/[\", ]/, "")} $1~/server_port/{ print $2 }' $tmpfile
 }
 
 service_list(){

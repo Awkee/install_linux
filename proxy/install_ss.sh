@@ -5,7 +5,7 @@
 # 脚本地址: https://github.com/Awkee
 ##########################################################
 
-conf_file="$HOME/.ss.conf"
+conf_file="$HOME/.ss2go.conf"
 red='\e[91m'
 green='\e[92m'
 yellow='\e[93m'
