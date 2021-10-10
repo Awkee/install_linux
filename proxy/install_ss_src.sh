@@ -160,25 +160,22 @@ service_status(){
 # 添加systemd服务
 add_service() {
     cmd="$1"
-    local service_name="$2"
-    local service_file="/usr/lib/systemd/system/${service_name}.service"
+    service_name="$2"
+    if [ "$service_name" = "" ] ;then
+        service_name="ss01"
+    fi
+    service_file="/usr/lib/systemd/system/${service_name}.service"
     while :
     do
-        if [ "$service_name" = "" ] ; then
-            read -p "输入新服务名(例如:ss01,或回车退出):" your_answer
-            if [ "$your_answer" = "" ] ; then
-                LOG "退出!"
-                exit 0
-            fi
-            service_name="$your_answer"
-        fi
         service_file="/usr/lib/systemd/system/${service_name}.service"
         if [ -f "$service_file" ] ; then
-            read -p "文件[${service_file}]已经存在！换个新服务名(例如:ss01,或回车退出)?" your_answer
-            if [ "${your_answer}" = "" ] ; then
-                exit 0
+            read -p "输入新服务名(默认：ss01):" your_answer
+            if [ "$your_answer" = "" ] ; then
+                LOG "使用默认值： ss01"
+            else
+                LOG "新服务名:" "${your_answer}"
+                service_name="$your_answer"
             fi
-            service_name="${your_answer}"
         fi
         break
     done
@@ -363,22 +360,6 @@ select_pass() {
     echo "$your_answer"
 }
 
-# Config shadowsocks
-config_shadowsocks(){
-    cat > /etc/shadowsocks.json <<EOF
-{
-    "server":"0.0.0.0",
-    "server_port":${shadowsocksport},
-    "local_address":"127.0.0.1",
-    "local_port":1080,
-    "password":"${shadowsockspwd}",
-    "timeout":300,
-    "method":"${shadowsockscipher}",
-    "fast_open":false
-}
-EOF
-}
-
 # 安装服务端
 install_server() {
     # 安装可执行程序
@@ -401,18 +382,18 @@ add_server(){
     echo "客户端/服务端使用的SS链接: ${ss_uri}"
 
     # 添加自启动服务
-    read -p "输入新服务名(例如:ss01,或回车退出):" your_answer
+    service_name="ss01"
+    read -p "输入新服务名(默认值ss01):" your_answer
     if [ "$your_answer" = "" ] ; then
-        LOG "退出!"
-        exit 0
+        LOG "使用默认值： ss01"
+    else
+        LOG "新服务名:" "${your_answer}"
+        service_name="$your_answer"
     fi
-    service_name="$your_answer"
     cat > /etc/shadowsocks_${service_name}.json <<EOF
 {
     "server":"${server_ip}",
     "server_port":${server_port},
-    "local_address":"127.0.0.1",
-    "local_port":1080,
     "password":"${random_password}",
     "timeout":300,
     "method":"${method}",
