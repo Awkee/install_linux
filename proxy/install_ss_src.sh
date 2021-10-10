@@ -6,6 +6,8 @@
 ##########################################################
 
 conf_file="$HOME/.ss.conf"
+server_bin="ss-server"
+
 red='\e[91m'
 green='\e[92m'
 yellow='\e[93m'
@@ -44,23 +46,78 @@ cmd_install() {
     return
 }
 
+# SIP003 plugin for shadowsocks
+install_plugin() {
+    if [ -f "/usr/bin/v2ray-plugin" ] ; then
+        echo "v2ray-plugin 已经安装成功!"
+        return 0
+    else
+        ver=$(curl -H 'Cache-Control: no-cache' -s https://api.github.com/repos/shadowsocks/v2ray-plugin/releases | grep -m1 'tag_name' | cut -d\" -f4)
+        if [[ ! $ver ]]; then
+            echo
+            echo -e " $red获取 v2ray-plugin 最新版本失败!!!$none"
+            exit 1
+        fi
+        _link="https://github.com/shadowsocks/v2ray-plugin/releases/download/$ver/v2ray-plugin-linux-amd64-${ver}.tar.gz"
+        wget -c ${_link}
+        tar zxvf v2ray-plugin-linux-amd64-${ver}.tar.gz
+        chmod +x v2ray-plugin-linux-amd64
+        mv v2ray-plugin-linux-amd64 /usr/bin/v2ray-plugin
+    fi
+
+    if [ -f "/usr/bin/v2ray-plugin" ] ; then
+        echo "v2ray-plugin 已经安装成功!"
+    else
+        echo "v2ray-plugin 安装失败啦，找找原因吧!"
+    fi
+}
+
 ## 1. 安装客户端命令
 install_ss_src(){
-	cmd_install shadowsocks-libev  simple-obfs
-	which ss-server >/dev/null
-	if [ "$?" = "0" ] ; then
-		echo "ss-server is already installed !"
-		return 0
-	fi
-	# CentOS 源码编译
-	cmd_install gcc gettext autoconf libtool automake make pcre-devel asciidoc xmlto c-ares-devel libev-devel libsodium-devel mbedtls-devel
-	wget -c https://github.com/shadowsocks/shadowsocks-libev/releases/download/v3.3.5/shadowsocks-libev-3.3.5.tar.gz
-	tar zxf shadowsocks-libev-3.3.5.tar.gz && cd shadowsocks-libev-3.3.5 && ./configure && make && make install
-	which ss-server >/dev/null
-	if [ "$?" = "0" ] ; then
-		echo "ss-server cannot be installed , you need to check reason!"
-		return 1
-	fi
+    which ${server_bin} >/dev/null
+    if [ "$?" = "0" ] ; then
+        echo "${server_bin} is already installed !"
+        return 0
+    fi
+    if which apt-get >/dev/null 2>&1 ; then 
+        # Debian/Ubuntu 
+        apt-get install -y shadowsocks-libev  simple-obfs
+        which ${server_bin} >/dev/null
+        if [ "$?" = "0" ] ; then
+            echo "${server_bin} is already installed !"
+            return 0
+        fi
+        # 源码安装依赖
+        apt-get install -y  --no-install-recommends build-essential autoconf libtool automake \
+            libssl-dev gawk debhelper dh-systemd init-system-helpers pkg-config asciidoc \
+            xmlto apg libpcre3-dev zlib1g-dev libev-dev libudns-dev libsodium-dev libmbedtls-dev libc-ares-dev
+    elif which yum >/dev/null 2>&1 ; then
+        # RHEL系列/CentOS/Fedora 源码编译
+        yum install epel-release -y
+        yum install gcc gettext autoconf libtool automake make pcre-devel asciidoc xmlto c-ares-devel libev-devel \
+            libsodium-devel mbedtls-devel -y
+        
+    elif which pacman >/dev/null 2>&1 ; then
+        # Archlinux & Manjaro 只支持安装包，没有源码安装
+        pacman -Sy --noconfirm shadowsocks-libev shadowsocks-v2ray-plugin
+        which ${server_bin} >/dev/null
+        if [ "$?" = "0" ] ; then
+            echo "${server_bin} is already installed !"
+            return 0
+        fi
+        echo "${server_bin} 安装失败啦！您的ArchLinux/Manjaro系统不包含 shadowsocks-libev/v2ray-plugin软件包"
+        exit 1
+    fi
+
+    wget -c https://github.com/shadowsocks/shadowsocks-libev/releases/download/v3.3.5/shadowsocks-libev-3.3.5.tar.gz
+    tar zxf shadowsocks-libev-3.3.5.tar.gz && cd shadowsocks-libev-3.3.5 && ./configure && make && make install
+    which ${server_bin} >/dev/null
+    if [ "$?" = "0" ] ; then
+        echo "${server_bin} 安装失败啦！找找原因！重新安装"
+        exit 1
+    fi
+    # 安装 v2ray-plugin 插件
+    install_plugin
 }
 
 service_port(){
@@ -106,7 +163,7 @@ add_service() {
     while :
     do
         if [ "$service_name" = "" ] ; then
-            read -p "输入新服务名(例如:ss2go01,或回车退出):" your_answer
+            read -p "输入新服务名(例如:ss01,或回车退出):" your_answer
             if [ "$your_answer" = "" ] ; then
                 LOG "退出!"
                 exit 0
@@ -115,7 +172,7 @@ add_service() {
         fi
         service_file="/usr/lib/systemd/system/${service_name}.service"
         if [ -f "$service_file" ] ; then
-            read -p "文件[${service_file}]已经存在！换个新服务名(例如:ss2go01,或回车退出)?" your_answer
+            read -p "文件[${service_file}]已经存在！换个新服务名(例如:ss01,或回车退出)?" your_answer
             if [ "${your_answer}" = "" ] ; then
                 exit 0
             fi
@@ -161,7 +218,6 @@ END
 # 初始化防火墙配置
 init_firewall() {
     echo "开始添加 iptables 防火墙配置"
-    maxlink="150"
     iptables -A INPUT -p tcp -m multiport --dport 22,80,443 -j ACCEPT    # 端口开放
     iptables -A INPUT -j DROP   #禁止其他未允许的规则访问
 
@@ -278,9 +334,9 @@ select_port() {
 
 function random_string_gen() {
     PASS=""
-    MATRIX="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_+" # "~!@#$%^&*()_+="
+    MATRIX="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" # "~!@#$%^&*()_+="
     LENGTH=$1
-    [ -z $1 ] && LENGTH="32"
+    [ -z $1 ] && LENGTH="16"
     while [ "${n:=1}" -le "$LENGTH" ]
     do
         PASS="$PASS${MATRIX:$(($RANDOM%${#MATRIX})):1}"
@@ -343,7 +399,7 @@ add_server(){
     echo "客户端/服务端使用的SS链接: ${ss_uri}"
 
     # 添加自启动服务
-    read -p "输入新服务名(例如:ss2go01,或回车退出):" your_answer
+    read -p "输入新服务名(例如:ss01,或回车退出):" your_answer
     if [ "$your_answer" = "" ] ; then
         LOG "退出!"
         exit 0
@@ -361,7 +417,7 @@ add_server(){
     "fast_open":false
 }
 EOF
-    run_cmd="ss-server -c /etc/shadowsocks_${service_name}.json"
+    run_cmd="${server_bin} -c /etc/shadowsocks_${service_name}.json"
     add_service "$run_cmd" "${service_name}"
     add_port ${server_port}
 
@@ -526,18 +582,15 @@ enable_bbr() {
 usage() {
     cat <<END
 Usage:
-    `basename $0` server                        # 第一次安装服务端
-    `basename $0` add                           # 服务端安装新服务
+    `basename $0` server                        # 第一次安装服务端使用(主要安装服务相关软件、源码编译相关包以及防火墙初始化配置)
+    `basename $0` add                           # 服务端安装新服务(多端口服务添加)
     `basename $0` uninstall                     # 卸载服务端安装的所有ss服务及相关软件
     `basename $0` uninstall [service]           # 卸载服务端安装的单个服务,service为服务名称
 
-    `basename $0` client uri  port              # 第一次安装客户端
-    `basename $0` remove                        # 卸载客户端安装软件及配置
-
     `basename $0` status [service]              # 服务端使用：查看SS链接URI信息(默认service名为ssserver或ssclient)
-    `basename $0` info                          # 客户端使用：查看SS链接URI信息(默认ssclient)
     
     `basename $0` list                          # 查看SS服务名称列表信息
+
 END
 }
 
@@ -558,13 +611,13 @@ case "$1" in
         check_root
         add_server
         ;;
-    client)
-        check_root
-        install_client $2 $3
-        ;;
     uninstall)
         check_root
         uninstall $2
+        ;;
+    client)
+        check_root
+        install_client $2 $3
         ;;
     remove)
         check_root
