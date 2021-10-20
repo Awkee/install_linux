@@ -12,6 +12,7 @@
 
 查看帮助信息：
 ```bash
+$ git clone https://github.com/Awkee/install_linux.git
 $ ./config_linux.sh -h
 Usage:
     config_linux.sh [-y]

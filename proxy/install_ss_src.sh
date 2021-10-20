@@ -365,7 +365,7 @@ install_server() {
     # 安装可执行程序
     install_ss_src
     
-    init_firewall
+    # init_firewall
 
     add_server
     enable_bbr
