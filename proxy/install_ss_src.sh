@@ -615,6 +615,9 @@ case "$1" in
     list)
         service_list
         ;;
+    bbr|enable_bbr)
+        enable_bbr
+        ;;
     *)
         usage
         ;;
