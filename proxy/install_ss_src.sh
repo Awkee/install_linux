@@ -7,6 +7,7 @@
 
 conf_file="$HOME/.ss.conf"
 server_bin="ss-server"
+server_ip=$(ifconfig eth0 | awk '/inet /{ print $2 }')
 
 red='\e[91m'
 green='\e[92m'
@@ -375,7 +376,6 @@ install_server() {
 add_server(){
     random_password=`select_pass`
     method=`select_cipher`
-    server_ip=$(ifconfig eth0 | awk '/inet /{ print $2 }')
     server_port=`select_port`
     
     ss_uri="ss://${method}:${random_password}@${server_ip}:${server_port}"
@@ -392,7 +392,6 @@ add_server(){
     fi
     cat > /etc/shadowsocks_${service_name}.json <<EOF
 {
-    "server":"${server_ip}",
     "server_port":${server_port},
     "password":"${random_password}",
     "timeout":300,
@@ -501,8 +500,7 @@ uninstall() {
 get_uri(){
     # 提取服务配置中的URI信息
     tmpfile=`systemctl cat ${service_name} | awk '/^ExecStart/{ print $3 }'`
-    awk -F: '{gsub(/[\", ]/, "")}
-    $1~/^server$/{ server_ip=$2}
+    awk -v server_ip=${server_ip} -F: '{gsub(/[\", ]/, "")}
     $1~/server_port/{ server_port=$2}
     $1~/password/{ password=$2 }
     $1~/method/{ method=$2 }
