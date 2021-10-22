@@ -401,7 +401,7 @@ add_server(){
 EOF
     run_cmd="${server_bin} -c /etc/shadowsocks_${service_name}.json"
     add_service "$run_cmd" "${service_name}"
-    add_port ${server_port}
+    # add_port ${server_port}
 
 }
 
