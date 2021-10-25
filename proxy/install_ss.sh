@@ -316,7 +316,7 @@ install_server() {
     # 安装可执行程序
     install_bin
     
-    init_firewall
+    # init_firewall
 
     add_server
     enable_bbr
@@ -340,7 +340,7 @@ add_server(){
     fi
     service_name="$your_answer"
     add_service "ss2go -s '${ss_uri}'" "${service_name}"
-    add_port ${server_port}
+    # add_port ${server_port}
 
 }
 
