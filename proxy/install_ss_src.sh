@@ -91,11 +91,11 @@ install_ss_src(){
         # 源码安装依赖
         apt-get install -y  --no-install-recommends build-essential autoconf libtool automake \
             libssl-dev gawk debhelper dh-systemd init-system-helpers pkg-config asciidoc \
-            xmlto apg libpcre3-dev zlib1g-dev libev-dev libudns-dev libsodium-dev libmbedtls-dev libc-ares-dev
+            xmlto apg libpcre3-dev zlib1g-dev libev-dev libudns-dev libsodium-dev libmbedtls-dev libc-ares-dev wget
     elif which yum >/dev/null 2>&1 ; then
         # RHEL系列/CentOS/Fedora 源码编译
         yum install epel-release -y
-        yum install gcc gettext autoconf libtool automake make pcre-devel asciidoc xmlto c-ares-devel libev-devel \
+        yum install wget gcc gettext autoconf libtool automake make pcre-devel asciidoc xmlto c-ares-devel libev-devel \
             libsodium-devel mbedtls-devel -y
         
     elif which pacman >/dev/null 2>&1 ; then
@@ -360,6 +360,7 @@ select_pass() {
     fi
     echo "$your_answer"
 }
+
 
 # 安装服务端
 install_server() {
