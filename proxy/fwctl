@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# filename: 防火墙管理脚本
+
+ipset_file=/etc/ipset_all.txt
+iptables_file=/etc/iptables_all.txt
+
+
+firewall_init() {
+    # 初始化防火墙配置规则
+    iptables -F
+
+    ipset -! create blacklist hash:net
+    ipset -! create whitelist hash:net
+
+    # 允许服务器本机对外访问:允许内部向外发消息
+    iptables -I OUTPUT -j ACCEPT
+    # 接收内部地址消息
+    iptables -A INPUT -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
+
+    # 放行已建立连接的相关数据
+    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+    # 开放端口列表
+    iptables -A INPUT -p tcp -m multiport --dports 22,443,8080,12340:12350 -j ACCEPT
+    # iptables -A INPUT -p tcp --dport 59657 -j ACCEPT
+
+    iptables -A INPUT -m set --match-set whitelist src -p udp --destination-port 53 -j ACCEPT
+    iptables -A INPUT -m set --match-set whitelist src -p tcp --destination-port 53 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 53 -j DROP
+    iptables -A INPUT -p udp --dport 53 -j DROP
+
+    iptables -A FORWARD -p icmp -j DROP
+    iptables -A INPUT -j DROP
+}
+
+
+firewall_save() {
+    # 导出防火墙配置规则
+    echo "备份 ipset 列表"
+    ipset save whitelist > $ipset_file
+    ipset save blacklist >> $ipset_file
+
+    # 导出iptables规则
+    echo "备份 iptables 规则"
+    iptables-save > $iptables_file
+}
+
+firewall_restore() {
+    # 恢复防火墙配置规则
+    echo "恢复 ipset 列表"
+    ipset restore $ipset_file
+
+    echo "恢复 iptables 防火墙规则"
+    iptables-restore $iptables_file
+}
+
+add_port() {
+    port=$1
+    iptables -I INPUT -p tcp --dport ${port} -j ACCEPT
+}
+
+del_port() {
+    port=$1
+    iptables -S| grep "dport ${port} "| awk '{ gsub("-A", "-D"); print "iptables "$0 }' | bash
+}
+
+add_wip() {
+    aip="$1"
+    ipset add whitelist $aip
+}
+
+del_wip() {
+    aip="$1"
+    ipset del whitelist $aip
+}
+
+add_bip() {
+    aip="$1"
+    ipset add blacklist $aip
+}
+
+del_bip() {
+    aip="$1"
+    ipset del blacklist $aip
+}
+
+firewall_status() {
+    echo "黑白名单IP列表规则："
+    ipset list
+    echo "=============================="
+    echo "防火墙规则："
+    iptables -S
+    echo "=============================="
+}
+
+usage(){
+    cat <<END
+Usage:
+    `basename $0` <init|save|restore>
+     firewall manager| 防火墙管理脚本
+
+Description:
+    init    第一次初始化防火墙规则，黑白名单为空
+    save    导出防火墙规则及黑白名单ipset列表
+    restore 恢复防火墙规则及黑白名单ipset列表
+    status  查看防火墙状态规则
+
+    add_port 添加开放TCP端口 
+    add_wip  添加白名单IP
+    add_bip  添加黑名单IP
+    del_port 删除开放TCP端口 
+    del_wip  删除白名单IP
+    del_bip  删除黑名单IP
+END
+}
+
+action="$1"
+
+case "$action" in
+    init)
+        firewall_init
+        ;;
+    save)
+        firewall_save
+        ;;
+    restore)
+        firewall_restore
+        ;;
+    status)
+        firewall_status
+        ;;
+    add_bip|add_wip|add_port|del_bip|del_wip|del_port)
+        $action
+        ;;
+    *)
+        usage
+        ;;
+esac
+
