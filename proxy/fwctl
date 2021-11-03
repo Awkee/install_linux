@@ -9,7 +9,6 @@ firewall_init() {
     # 初始化防火墙配置规则
     iptables -F
 
-    ipset -! create blacklist hash:net
     ipset -! create whitelist hash:net
 
     # 允许服务器本机对外访问:允许内部向外发消息
@@ -21,8 +20,12 @@ firewall_init() {
     iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
     # 开放端口列表
-    iptables -A INPUT -p tcp -m multiport --dports 22,443,8080,12340:12350 -j ACCEPT
-    # iptables -A INPUT -p tcp --dport 59657 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+    iptables -A INPUT -m set --match-set whitelist src -p udp --destination-port 443 -j ACCEPT
+    iptables -A INPUT -m set --match-set whitelist src -p tcp --destination-port 443 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 443 -j DROP
+    iptables -A INPUT -p udp --dport 443 -j DROP
 
     iptables -A INPUT -m set --match-set whitelist src -p udp --destination-port 53 -j ACCEPT
     iptables -A INPUT -m set --match-set whitelist src -p tcp --destination-port 53 -j ACCEPT
@@ -74,18 +77,8 @@ del_wip() {
     ipset del whitelist $aip
 }
 
-add_bip() {
-    aip="$1"
-    ipset add blacklist $aip
-}
-
-del_bip() {
-    aip="$1"
-    ipset del blacklist $aip
-}
-
 firewall_status() {
-    echo "黑白名单IP列表规则："
+    echo "白名单IP列表规则："
     ipset list
     echo "=============================="
     echo "防火墙规则："
@@ -107,10 +100,8 @@ Description:
 
     add_port 添加开放TCP端口 
     add_wip  添加白名单IP
-    add_bip  添加黑名单IP
     del_port 删除开放TCP端口 
     del_wip  删除白名单IP
-    del_bip  删除黑名单IP
 END
 }
 
@@ -129,11 +120,10 @@ case "$action" in
     status)
         firewall_status
         ;;
-    add_bip|add_wip|add_port|del_bip|del_wip|del_port)
-        $action
+    add_wip|add_port|del_wip|del_port)
+        $action $2
         ;;
     *)
         usage
         ;;
 esac
-
