@@ -113,7 +113,7 @@ install_ss_src(){
     wget -c https://github.com/shadowsocks/shadowsocks-libev/releases/download/v3.3.5/shadowsocks-libev-3.3.5.tar.gz
     tar zxf shadowsocks-libev-3.3.5.tar.gz && cd shadowsocks-libev-3.3.5 && ./configure && make && make install
     which ${server_bin} >/dev/null
-    if [ "$?" = "0" ] ; then
+    if [ "$?" != "0" ] ; then
         echo "${server_bin} 安装失败啦！找找原因！重新安装"
         exit 1
     fi
