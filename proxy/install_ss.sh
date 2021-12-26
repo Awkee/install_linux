@@ -324,9 +324,18 @@ install_server() {
 
 # 添加新服务
 add_server(){
+    server_ip=`ip -f inet address show eth0 |awk '/inet /{ addr=$2; gsub("/.*", "",addr); print addr }'`
+    if [ "$?" != "0" ] ; then
+        server_ip=$(ifconfig eth0 | awk '/inet /{ print $2 }')
+        if [ "$?" != "0" ] ; then
+            echo "获取IP地址失败了，请安装ip命令或者ifconfig命令"
+            exit 1
+        fi
+    fi
+    
     random_password=`select_pass`
     method=`select_cipher`
-    server_ip=$(ifconfig eth0 | awk '/inet /{ print $2 }')
+    
     server_port=`select_port`
 
     ss_uri="ss://${method}:${random_password}@${server_ip}:${server_port}"
